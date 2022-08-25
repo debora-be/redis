@@ -9,9 +9,10 @@ defmodule Redis.Application do
   def start(_type, _args) do
     children = [
       # Starts a worker by calling:
-    #Redis.Worker.start_link(arg),
+    Redis.Worker.start_link(arg),
       # {Redis.Worker, arg}
-    + Redis.Kv
+    Redis.Kv
+    {Task, fn -> Redis.Server.accept(String.to_integer(System.get_env("PORT") || "6379")) end}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
