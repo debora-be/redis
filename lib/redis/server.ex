@@ -1,6 +1,7 @@
 defmodule Redis.Server do
   require Logger
 
+  alias Redis.Parser
   def accept(port) do
     # The options below mean:
     #
@@ -18,16 +19,27 @@ defmodule Redis.Server do
 
   defp loop_acceptor(socket) do
     {:ok, client} = :gen_tcp.accept(socket)
-    serve(client)
+    serve(client, 0)
     loop_acceptor(socket)
   end
 
-  defp serve(socket) do
-    socket
-    |> read_line()
-    |> write_line(socket)
+  defp serve(socket, state) do
+    case read_line(socket) do
+      {:ok, data} ->
+        state = state <> data
 
-    serve(socket)
+        case Parser.decode(state) do
+          {:ok, command} ->
+            handle_command(socket, command)
+            serve(socket, "")
+
+          {:incomplete, _} ->
+            serve(socket, state)
+        end
+
+      {:error, reason} ->
+        Logger.info("Receive error: #{inspect(reason)}")
+    end
   end
 
   defp read_line(socket) do
@@ -35,7 +47,21 @@ defmodule Redis.Server do
     data
   end
 
-  defp write_line(line, socket) do
-    :gen_tcp.send(socket, line)
+  defp reply(socket, data) do
+    :gen_tcp.send(socket, data)
+  end
+
+  defp handle_command(socket, command) do
+    case command do
+      ["SET", key, value] ->
+        Redis.Kv.set(key, value)
+        reply(socket, "+OK\r\n")
+
+      ["GET", key] ->
+        case Redis.Kv.get(key) do
+          {:ok, value} -> reply(socket, "+#{value}\r\n")
+          {:error, :not_found} -> reply(socket, "$-1\r\n")
+        end
+    end
   end
 end
