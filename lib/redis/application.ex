@@ -8,8 +8,10 @@ defmodule Redis.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      # Starts a worker by calling: Redis.Worker.start_link(arg)
+      # Starts a worker by calling:
+    #Redis.Worker.start_link(arg),
       # {Redis.Worker, arg}
+    + Redis.Kv
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
